@@ -209,3 +209,25 @@ body {
   overflow: hidden;
   background: var(--bg);
 }
+
+.pattern-grid {
+  background-color: #d6d6d6;
+  background-image:
+    linear-gradient(90deg, rba(0,0,0, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.pattern-dots{
+  background-color: #d6d6d6;
+  background-image: radial-gradient(#777 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.pattern-stripes {
+  background: repeating-linear-gradient(45deg, #d8d8d8 0 6px, #cecece 6px 12px);
+}
+
+.pattern-plain {
+  background: #d6d6d6;
+}

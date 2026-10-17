@@ -3,10 +3,31 @@ const bootProgress = document.getElementById('boot-progress');
 const shutdownScreen = document.getElementById('shutdown-screen');
 const powerOnBtn = document.getElementById('power-on');
 const os = document.getElementById('os');
+
 const desktopEl = document.getElementById('desktop');
 const desktopIconsEl = document.getElementById('desktop-icons');
+const activeAppEl = document.getElementById('active-app');
+const clockEl = document.getElementById('clock');
 
-const desktop = new DesktopManager(desktopEl, desktopIconsEl, () => {});
+const windowManager = new WindowManager(desktopEl, activeAppEl);
+const apps = new AppsManager({ windowManager, desktopEl });
+
+const appIdMap = {
+  about: 'window-about',
+  finder: 'window-finder',
+  notes: 'window-notes',
+  paint: 'window-paint',
+  calculator: 'window-calculator',
+  control: 'window-control',
+  trash: 'window-trash',
+  clock: 'window-clock',
+  puzzle: 'window-puzzle',
+  keycaps: 'window-keycaps'
+};
+
+const desktop = new DesktopManager(desktopEl, desktopIconsEl, (appName) => {
+  if (appIdMap[appName]) windowManager.open(appName);
+});
 
 function bootSystem() {
   os.classList.add('hidden');
@@ -24,9 +45,29 @@ function bootSystem() {
       setTimeout(() => {
         bootScreen.classList.add('hidden');
         os.classList.remove('hidden');
+        setupDesktop();
+        desktop.cleanUpIcons();
       }, 220);
     }
   }, 42);
+}
+
+function setupClock() {
+  if (!clockEl) return;
+
+  const update = () => {
+    clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  update();
+  setInterval(update, 1000);
+}
+
+function setupWindows() {
+  Object.entries(appIdMap).forEach(([key, elementId]) => {
+    const winEl = document.getElementById(elementId);
+    windowManager.register(key, winEl);
+  });
 }
 
 function setupMenus() {
@@ -46,6 +87,7 @@ function setupMenus() {
       closeMenus();
       if (shouldOpen) {
         item.classList.add('active');
+        target.style.left = `${item.offsetLeft}px`;
         target.classList.remove('hidden');
       }
     });
@@ -64,17 +106,38 @@ function setupMenus() {
 }
 
 function runAction(action) {
+  if (action === 'about') return windowManager.open('about');
   if (action === 'restart') return bootSystem();
   if (action === 'shutdown') {
     os.classList.add('hidden');
     shutdownScreen.classList.remove('hidden');
     return;
   }
+
+  const opens = { 'open-clock': 'clock', 'open-calculator': 'calculator', 'open-control': 'control', 'open-keycaps': 'keycaps', 'open-puzzle': 'puzzle' };
+  if (opens[action]) return windowManager.open(opens[action]);
+
+  if (action === 'open-finder') return windowManager.open('finder');
+  if (action === 'new-note') return windowManager.open('notes');
+  if (action === 'close-window') return windowManager.closeActive();
+
+  if (action === 'clean-up') return desktop.cleanUpIcons();
+  if (action === 'toggle-grid') return desktop.toggleGrid();
+  if (action === 'bring-all-front') return windowManager.bringAllToFront();
+  if (action === 'empty-trash') {
+    windowManager.open('trash');
+    document.getElementById('empty-trash-btn').click();
+    return;
+  }
+
+  if (['undo', 'redo', 'cut', 'copy', 'paste', 'clear', 'select-all'].includes(action)) {
+    apps.handleEditAction(action);
+  }
 }
 
 async function setupDesktop() {
   const icons = [
-    { key: 'floppy', src: 'assets/floppy disk icon.png', label: 'system 1.1 finder 1', app: 'finder', position: 'right-top' },
+    { key: 'floppy', src: 'assets/floppy disk icon.png', label: 'Backup Disk', app: 'finder', position: 'right-top' },
     { key: 'trash', src: 'assets/trash icon.png', label: 'Trash', app: 'trash', position: 'right-bottom' }
   ];
 
@@ -85,11 +148,18 @@ async function setupDesktop() {
   });
 }
 
-function init() {
+powerOnBtn.addEventListener('click', bootSystem);
+window.addEventListener('resize', () => {
+  windowManager.clampToDesktop();
+  desktop.cleanUpIcons();
+});
+
+async function init() {
+  setupWindows();
   setupMenus();
-  setupDesktop();
+  setupClock();
+  apps.init();
   bootSystem();
 }
 
-powerOnBtn.addEventListener('click', init);
 init();

@@ -1,3 +1,4 @@
+// Desktop manager: creates icons, downloads icon images, and supports drag/select/open.
 const FALLBACK_ICONS = {
   finder: 'assets/floppy disk icon.png',
   trash: 'assets/trash icon.png'
@@ -44,28 +45,25 @@ class DesktopManager {
     }
   }
 
-  getIconPosition(icon, index) {
-    const w = Math.max(this.desktopEl.clientWidth || window.innerWidth, 600);
-    const h = Math.max(this.desktopEl.clientHeight || 400, 300);
-    if (icon.position === 'right-top') {
-      return { x: Math.max(w - 100, 20), y: 20 };
-    }
-    if (icon.position === 'right-bottom') {
-      return { x: Math.max(w - 100, 20), y: Math.max(h - 120, 120) };
-    }
-    return { x: 20, y: 20 };
-  }
+
 
   attachIconInteraction(iconEl, appName) {
     let dragStart = null;
     let hasMoved = false;
+    let draggedElement = null;
 
     iconEl.addEventListener('click', (event) => {
       event.stopPropagation();
       this.selectIcon(iconEl);
     });
 
+    iconEl.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      this.openApp(appName);
+    });
+
     iconEl.addEventListener('mousedown', (event) => {
+      draggedElement = iconEl;
       const rect = iconEl.getBoundingClientRect();
       const deskRect = this.desktopEl.getBoundingClientRect();
       dragStart = {
@@ -78,8 +76,8 @@ class DesktopManager {
       this.selectIcon(iconEl);
     });
 
-    window.addEventListener('mousemove', (event) => {
-      if (!dragStart) return;
+    const handleMouseMove = (event) => {
+      if (!dragStart || draggedElement !== iconEl) return;
       hasMoved = true;
 
       const left = Math.max(0, Math.min(event.clientX - dragStart.deskLeft - dragStart.offsetX, this.desktopEl.clientWidth - iconEl.offsetWidth));
@@ -87,31 +85,110 @@ class DesktopManager {
 
       iconEl.style.left = `${left}px`;
       iconEl.style.top = `${top}px`;
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    const handleMouseUp = () => {
+      if (!dragStart || draggedElement !== iconEl) return;
+
+      if (hasMoved && this.gridEnabled) {
+        this.snapIconToGrid(iconEl);
+      }
+
       dragStart = null;
       hasMoved = false;
-    });
+      draggedElement = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   }
 
   selectIcon(iconEl) {
-    if (this.selectedIconEl) {
-      this.selectedIconEl.classList.remove('selected');
-    }
+    this.iconsContainerEl.querySelectorAll('.desktop-icon').forEach((el) => el.classList.remove('selected'));
     iconEl.classList.add('selected');
     this.selectedIconEl = iconEl;
   }
 
   clearSelection() {
-    if (this.selectedIconEl) {
-      this.selectedIconEl.classList.remove('selected');
-      this.selectedIconEl = null;
+    this.iconsContainerEl.querySelectorAll('.desktop-icon').forEach((el) => el.classList.remove('selected'));
+    this.selectedIconEl = null;
+  }
+
+  cleanUpIcons() {
+    const nodes = [...this.iconsContainerEl.querySelectorAll('.desktop-icon')];
+    nodes.forEach((iconEl, index) => {
+      const icon = this.icons[index] || {};
+      const pos = this.getIconPosition(icon, index);
+      iconEl.style.left = `${pos.x}px`;
+      iconEl.style.top = `${pos.y}px`;
+    });
+  }
+
+  toggleGrid() {
+    this.gridEnabled = !this.gridEnabled;
+    if (this.gridEnabled) {
+      this.desktopEl.classList.add('grid-mode');
+      // Snap all icons to grid when enabling grid mode
+      const iconElements = this.iconsContainerEl.querySelectorAll('.desktop-icon');
+      iconElements.forEach((iconEl) => {
+        this.snapIconToGrid(iconEl);
+      });
+    } else {
+      this.desktopEl.classList.remove('grid-mode');
     }
   }
 
-  cleanUpIcons() {}
-  toggleGrid() { this.gridEnabled = !this.gridEnabled; }
+  gridPosition(index) {
+    const column = Math.floor(index / 6);
+    const row = index % 6;
+    return {
+      x: 24 + column * 85,
+      y: 18 + row * 70
+    };
+  }
+
+  getIconPosition(icon, index) {
+    if (icon.position === 'left-top') {
+      return {
+        x: 16,
+        y: 22
+      };
+    }
+
+    if (icon.position === 'left-bottom') {
+      return {
+        x: 16,
+        y: Math.max(22, this.desktopEl.clientHeight - 108)
+      };
+    }
+
+    if (icon.position === 'right-top') {
+      return {
+        x: Math.max(8, this.desktopEl.clientWidth - 96),
+        y: 22
+      };
+    }
+
+    if (icon.position === 'right-bottom') {
+      return {
+        x: Math.max(8, this.desktopEl.clientWidth - 96),
+        y: Math.max(22, this.desktopEl.clientHeight - 108)
+      };
+    }
+
+    return this.gridPosition(index);
+  }
+
+  snapIconToGrid(iconEl) {
+    const x = parseInt(iconEl.style.left || '0', 10);
+    const y = parseInt(iconEl.style.top || '0', 10);
+
+    const gx = Math.max(24, Math.round((x - 24) / 85) * 85 + 24);
+    const gy = Math.max(18, Math.round((y - 18) / 70) * 70 + 18);
+
+    iconEl.style.left = `${gx}px`;
+    iconEl.style.top = `${gy}px`;
+  }
 }
 
 window.DesktopManager = DesktopManager;
